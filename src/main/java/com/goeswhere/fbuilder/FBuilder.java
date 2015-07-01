@@ -72,7 +72,7 @@ public class FBuilder {
         final Thread copier = new Thread(() -> {
 
             try (final BufferedReader from = new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8));
-                 final PrintWriter to = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+                 final PrintWriter to = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8))) {
                 String line;
                 while (null != (line = from.readLine())) {
                     to.println(line);
