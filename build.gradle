@@ -4,6 +4,9 @@ task wrapper(type: Wrapper) {
 
 apply plugin: 'idea'
 apply plugin: 'java'
+apply plugin: 'application'
+
+mainClassName = 'com.goeswhere.qfbuild.QfBuild'
 
 repositories {
     mavenCentral()
@@ -11,5 +14,4 @@ repositories {
 
 dependencies {
     compile 'com.google.guava:guava:18.0'
-    compile 'org.eclipse.jetty.aggregate:jetty-all:9.2.10.v20150310'
 }

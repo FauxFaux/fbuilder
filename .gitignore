@@ -2,3 +2,5 @@
 classloadertest.iml
 .gradle
 build
+*.rbuild
+*.iml
