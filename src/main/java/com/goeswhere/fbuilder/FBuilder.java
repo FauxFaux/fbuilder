@@ -7,6 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
 
 public class FBuilder {
+    private static final String HOSTNAME_TO_CHECK = "urika";
+
+    private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":9999/debian";
+
     public static void main(String[] args) throws IOException, InterruptedException {
         final int threads = Runtime.getRuntime().availableProcessors();
 
@@ -88,8 +92,8 @@ public class FBuilder {
             exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", base, "--", "-d", "debian", "-r", "sid", "-a", "amd64");
             start(base);
             shellIn(base, "printf " +
-                    "'deb http://urika:9999/debian sid main contrib non-free\\n" +
-                    "deb-src http://urika:9999/debian sid main contrib non-free'" +
+                    "'deb " + MIRROR + " sid main contrib non-free\\n" +
+                    "deb-src " + MIRROR + " sid main contrib non-free'" +
                     " > /etc/apt/sources.list");
             in(base, "apt-get", "update");
             in(base, "apt-get", "dist-upgrade", "-y");
@@ -101,7 +105,7 @@ public class FBuilder {
     private static void start(String vm) throws IOException, InterruptedException {
         exec("lxc-start", "-n", vm, "--logfile", "/tmp/a.log", "-l", "DEBUG");
         exec("lxc-wait", "-n", vm, "-s", "RUNNING");
-        shellIn(vm, "while ! arp urika; do sleep 1; done");
+        shellIn(vm, "while ! arp " + HOSTNAME_TO_CHECK + "; do sleep 1; done");
     }
 
     private static void stopPolitely(String vm) throws IOException, InterruptedException {
