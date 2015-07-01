@@ -1,4 +1,4 @@
-package com.goeswhere.qfbuild;
+package com.goeswhere.fbuilder;
 
 import java.util.ArrayList;
 import java.util.Collections;
