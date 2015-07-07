@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 public class FBuilder {
     private static final String HOSTNAME_TO_CHECK = "urika";
 
-    private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":9999/debian";
+    private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":3142/ftp.debian.org/debian";
 
     public static void main(String[] args) throws IOException, InterruptedException {
         final int threads = Runtime.getRuntime().availableProcessors();
