@@ -15,14 +15,14 @@ public class FBuilder {
 
         for (String pkg : args)
             ex.submit(() -> {
-                final WithVm newVm = new WithVm("qbuild-" + pkg, TimeUnit.MINUTES.toMillis(10));
+                final WithVm newVm = new WithVm("fbuild-" + pkg, TimeUnit.MINUTES.toMillis(10));
 
+                final File rbuild = new File("wip-" + pkg + ".rbuild");
                 try {
                     newVm.cloneFrom(base);
                     newVm.start();
-                    final File rbuild = new File("wip-" + pkg + ".rbuild");
-                    newVm.inTee(rbuild, "apt-get", "build-dep", "-y", pkg);
                     newVm.inTee(rbuild, "apt-get", "source", pkg);
+                    newVm.inTee(rbuild, "apt-get", "build-dep", "-y", pkg);
                     final boolean success = 0 == newVm.inTee(rbuild, "sh", "-c", "cd " + pkg + "-* && dpkg-buildpackage -us -uc");
                     newVm.stopNow();
                     if (success) {
@@ -34,7 +34,8 @@ public class FBuilder {
                         System.out.println("failure: " + pkg);
                     }
                 } catch (Exception e) {
-                    System.err.println("build failed: " + pkg);
+                    rbuild.renameTo(new File("error-" + pkg + ".rbuild"));
+                    System.err.println("build error: " + pkg);
                     e.printStackTrace();
                     newVm.stopNow();
                 }

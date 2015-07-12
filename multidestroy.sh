@@ -1,2 +1,2 @@
 #!/bin/sh
-lxc-ls | fgrep qbuild | while read x; do ./destroy.sh $x; done
+lxc-ls | fgrep fbuild | while read x; do ./destroy.sh $x; done
