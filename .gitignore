@@ -4,3 +4,4 @@ classloadertest.iml
 build
 *.rbuild
 *.iml
+*.swp
