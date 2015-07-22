@@ -56,11 +56,14 @@ public class WithVm {
 
     void createIfNotPresent() throws IOException, InterruptedException {
         if (0 != execCode("lxc-info", "-n", vm)) {
-            exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", vm, "--", "-d", "debian", "-r", "sid", "-a", "amd64");
+            final String imageName = "jessie";
+            String targetDist = "testing";
+
+            exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", vm, "--", "-d", "debian", "-r", imageName, "-a", "amd64");
             start();
             shellIn("printf " +
-                    "'deb " + MIRROR + " sid main contrib non-free\\n" +
-                    "deb-src " + MIRROR + " sid main contrib non-free'" +
+                    "'deb " + MIRROR + " " + targetDist + " main contrib non-free\\n" +
+                    "deb-src " + MIRROR + " " + targetDist + " main contrib non-free'" +
                     " > /etc/apt/sources.list");
             in("apt-get", "update");
             in("apt-get", "dist-upgrade", "-y");
@@ -105,6 +108,8 @@ public class WithVm {
     private static ProcessBuilder setupExec(String... cmd) {
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
+        builder.environment().clear();
+        builder.environment().put("HOME", "/tmp");
         builder.environment().put("LANG", "en_US.UTF-8");
         builder.environment().put("LANGUAGE", "en_US:en");
         builder.environment().put("TZ", "UTC");
