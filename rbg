@@ -19,10 +19,15 @@ Source: $P
 Version: $V
 Severity: serious
 Justification: fails to build from source
+Tags: sid stretch
+User: reproducible-builds@lists.alioth.debian.org
+Usertags: ftbfs
+X-Debbugs-CC: reproducible-builds@lists.alioth.debian.org
 
 Dear Maintainer,
 
 The package fails to build:
+
 $(cat $F)
 
 Full build log:
