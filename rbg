@@ -1,0 +1,44 @@
+#!/bin/zsh
+set -eu
+
+F=$1
+V=$(fgrep -m1 '(dsc) [' $F | cut -d ' ' -f 5)
+P=${F#failure-}
+P=${P%*.rbuild}
+
+T=$(mktemp)
+trap "rm $T" EXIT
+
+cat >$T <<END
+From: "Chris West (Faux)" <solo-debianbugs@goeswhere.com>
+To: Debian Bug Tracking System <submit@bugs.debian.org>
+Subject: $P: FTBFS: 
+X-Debbugs-Cc: solo-debianbugs@goeswhere.com
+
+Source: $P
+Version: $V
+Severity: serious
+Justification: fails to build from source
+
+Dear Maintainer,
+
+The package fails to build:
+$(cat $F)
+
+Full build log:
+https://reproducible.debian.net/rb-pkg/unstable/amd64/$P.html
+
+-- System Information:
+Debian Release: stretch/sid
+APT prefers unstable
+APT policy: (500, 'unstable')
+Architecture: amd64 (x86_64)
+
+Kernel: Linux 3.19.0-23-generic (SMP w/8 CPU cores)
+Locale: LANG=en_GB.UTF-8, LC_CTYPE=en_GB.UTF-8 (charmap=UTF-8)
+Shell: /bin/sh linked to /bin/dash
+Init: systemd (via /run/systemd/system)
+END
+
+mutt -H $T submit@bugs.debian.org
+
