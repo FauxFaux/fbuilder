@@ -28,7 +28,7 @@ public class WithVm {
     }
 
     int inTee(File rbuild, String... args) throws IOException, InterruptedException {
-        return tee(rbuild, l("lxc-attach", "-n", vm, "--").l(args).b());
+        return tee(rbuild, attach(args));
     }
 
     private int tee(File file, String... args) throws IOException, InterruptedException {
@@ -96,7 +96,7 @@ public class WithVm {
     }
 
     private void in(String... args) throws IOException, InterruptedException {
-        exec(l("lxc-attach", "-n", vm, "--").l(args).b());
+        exec(attach(args));
     }
 
     private void exec(String... cmd) throws IOException, InterruptedException {
@@ -108,13 +108,17 @@ public class WithVm {
     private static ProcessBuilder setupExec(String... cmd) {
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
-        builder.environment().clear();
-        builder.environment().put("HOME", "/tmp");
-        builder.environment().put("LANG", "en_US.UTF-8");
-        builder.environment().put("LANGUAGE", "en_US:en");
-        builder.environment().put("TZ", "UTC");
-        builder.environment().put("DEBIAN_FRONTEND", "noninteractive");
         return builder;
+    }
+
+    private String[] attach(String[] args) {
+        return l("lxc-attach", "--clear-env", "-n", vm, "--", "env",
+                "LANG=en_US.UTF-8",
+                "HOME=/tmp",
+                "LANGUAGE=en_US:en",
+                "TZ=UTC",
+                "DEBIAN_FRONTEND=noninteractive"
+                ).l(args).b();
     }
 
     private int execCode(String... cmd) throws IOException, InterruptedException {
