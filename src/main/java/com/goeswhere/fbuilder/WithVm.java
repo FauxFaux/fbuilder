@@ -56,8 +56,10 @@ public class WithVm {
 
     void createIfNotPresent() throws IOException, InterruptedException {
         if (0 != execCode("lxc-info", "-n", vm)) {
-            final String imageName = "jessie";
-            String targetDist = "testing";
+            final String imageName = "sid";
+            String targetDist = "sid";
+//            String imageName = "jessie";
+//            String targetDist = "testing";
 
             exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", vm, "--", "-d", "debian", "-r", imageName, "-a", "amd64");
             start();

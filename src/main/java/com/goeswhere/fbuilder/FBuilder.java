@@ -21,7 +21,7 @@ public class FBuilder {
                 try {
                     newVm.cloneFrom(base);
                     newVm.start();
-                    newVm.inTee(rbuild, "apt-get", "source", pkg);
+                    newVm.inTee(rbuild, "apt-get", "-oAPT::Get::Only-Source=true", "source", pkg);
                     newVm.inTee(rbuild, "apt-get", "build-dep", "-y", pkg);
                     newVm.inTee(rbuild, "ifdown", "eth0");
                     final boolean success = 0 == newVm.inTee(rbuild, "sh", "-c", "cd " + pkg + "-* && dpkg-buildpackage -us -uc");
