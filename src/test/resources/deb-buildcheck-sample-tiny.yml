@@ -1,0 +1,53 @@
+output-version: 1.0
+native-architecture: amd64
+report:
+ -
+  package: src:0ad
+  version: 0.0.18-1
+  architecture: amd64,armhf,i386,kfreebsd-amd64,kfreebsd-i386
+  essential: false
+  source: 0ad (= 0.0.18-1)
+  status: ok
+  installationset:
+   -
+    package: src:0ad
+    version: 0.0.18-1
+    architecture: amd64,armhf,i386,kfreebsd-amd64,kfreebsd-i386
+    essential: false
+   -
+    package: adduser:amd64
+    version: 3.113+nmu3
+    architecture: all
+    essential: false
+   -
+    package: autoconf:amd64
+    version: 2.69-9
+    architecture: all
+    essential: false
+   -
+    package: base-files:amd64
+    version: 9.4
+    architecture: amd64
+    essential: true
+ -
+  package: src:zzzeeksphinx
+  version: 1.0.17-1
+  architecture: all
+  essential: false
+  source: zzzeeksphinx (= 1.0.17-1)
+  status: ok
+  installationset:
+   -
+    package: src:zzzeeksphinx
+    version: 1.0.17-1
+    architecture: all
+    essential: false
+   -
+    package: zlib1g:amd64
+    version: 1:1.2.8.dfsg-2+b1
+    architecture: amd64
+    essential: false
+ 
+background-packages: 70915
+foreground-packages: 23392
+broken-packages: 251

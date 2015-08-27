@@ -10,6 +10,7 @@ import org.yaml.snakeyaml.events.*;
 
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -19,12 +20,19 @@ import java.util.function.Function;
 
 public class DoseReader {
     public static void main(String[] args) throws Exception {
+        final InputStreamReader reader = new InputStreamReader(new FileInputStream(args[0]));
+
         final Stopwatch timer = Stopwatch.createStarted();
-        final PeekingIterator<Event> it = Iterators.peekingIterator(new Yaml().parse(new InputStreamReader(new FileInputStream(args[0]))).iterator());
+        List<SourcePackage> packages = new ArrayList<>(100);
+        readDebBuildCheckSourcePackages(reader, packages::add);
+        System.out.println(packages.size());
+        System.out.println(timer);
+    }
+
+    static void readDebBuildCheckSourcePackages(Reader reader, Consumer<SourcePackage> into) {
+        final PeekingIterator<Event> it = Iterators.peekingIterator(new Yaml().parse(reader).iterator());
         check(it.next() instanceof StreamStartEvent);
         check(it.next() instanceof DocumentStartEvent);
-
-        List<SourcePackage> packages = new ArrayList<>(100);
 
         readMap(it, (key, ev) -> {
             switch (key) {
@@ -37,15 +45,12 @@ public class DoseReader {
                     break;
                 case "report":
                     check(ev instanceof SequenceStartEvent);
-                    readSeq(it, DoseReader::readSourcePackage, packages::add);
+                    readSeq(it, DoseReader::readSourcePackage, into);
                     break;
                 default:
                     throw new IllegalStateException(key);
             }
         });
-
-        System.out.println(packages.size());
-        System.out.println(timer);
     }
 
     private static SourcePackage readSourcePackage(PeekingIterator<Event> it) {
