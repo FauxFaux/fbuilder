@@ -12,6 +12,8 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.Iterator;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class DoseReader {
     public static void main(String[] args) throws Exception {
@@ -27,30 +29,11 @@ public class DoseReader {
                 case "background-packages":
                 case "foreground-packages":
                 case "broken-packages":
-//                    System.out.println(ev);
+                    // ignored
                     break;
                 case "report":
                     check(ev instanceof SequenceStartEvent);
-                    readSeq(it, () -> readMap(it, (skey, sev) -> {
-                        switch (skey) {
-                            case "package":
-                            case "version":
-                            case "architecture":
-                            case "essential":
-                            case "source":
-                            case "status":
-//                                    System.out.println(sev);
-                                break;
-                            case "installationset":
-                                check(sev instanceof SequenceStartEvent);
-                                readSeq(it, () -> readMap(it, (ikey, iev) -> {
-//                                  System.out.println("ins: " + ikey + " -> " + iev);
-                                }));
-                                break;
-                            default:
-                                throw new IllegalStateException(skey);
-                        }
-                    }));
+                    readSeq(it, DoseReader::readSourcePackage, System.out::println);
                     break;
                 default:
                     throw new IllegalStateException(key);
@@ -59,9 +42,83 @@ public class DoseReader {
         System.out.println(timer);
     }
 
-    private static void readSeq(PeekingIterator<Event> it, Runnable elementHandler) {
+    private static SourcePackage readSourcePackage(PeekingIterator<Event> it) {
+        final SourcePackage source = new SourcePackage();
+        readMap(it, (key, ev) -> {
+            switch (key) {
+                case "package":
+                    source.name = asString(ev);
+                    break;
+                case "version":
+                    source.version = asString(ev);
+                    break;
+                case "architecture":
+                case "essential":
+                case "source":
+                case "status":
+                    // ignored
+                    break;
+                case "installationset":
+                    check(ev instanceof SequenceStartEvent);
+                    readSeq(it, DoseReader::readBinaryPackage, source.deps::add);
+                    break;
+                default:
+                    throw new IllegalStateException(key);
+            }
+        });
+
+        source.deps.remove(source.nameAndVersion());
+
+        return source;
+    }
+
+    private static String asString(Event event) {
+        check(event instanceof ScalarEvent);
+        return ((ScalarEvent)event).getValue();
+    }
+
+    private static String readBinaryPackage(PeekingIterator<Event> it) {
+        class NameVersion {
+            String name;
+            String version;
+
+            @Override
+            public String toString() {
+                if (null == name || null == version) {
+                    throw new IllegalStateException("name or version not set: " + name + ", " + version);
+                }
+
+                return name + "=" + version;
+            }
+        }
+
+        final NameVersion pkg = new NameVersion();
+        readMap(it, (key, ev) -> {
+            switch (key) {
+                case "package":
+                    pkg.name = asString(ev);
+                    break;
+                case "version":
+                    pkg.version = asString(ev);
+                    break;
+                case "architecture":
+                case "essential":
+                    // ignored
+                    break;
+                default:
+                    throw new IllegalStateException(key);
+            }
+        });
+
+        return pkg.name + "=" + pkg.version;
+    }
+
+    private static <T> void readSeq(
+            PeekingIterator<Event> it,
+            Function<PeekingIterator<Event>, ? extends T> elementHandler,
+            Consumer<? super T> resultsInto) {
         do {
-            elementHandler.run();
+            resultsInto.accept(elementHandler.apply(it));
         } while (it.peek() instanceof MappingStartEvent);
         check(it.next() instanceof SequenceEndEvent);
     }
@@ -73,7 +130,7 @@ public class DoseReader {
             if (next instanceof MappingEndEvent) {
                 break;
             }
-            callback.accept(((ScalarEvent) next).getValue(), it.next());
+            callback.accept(asString(next), it.next());
         } while (true);
     }
 
