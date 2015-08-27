@@ -10,7 +10,9 @@ import org.yaml.snakeyaml.events.*;
 
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -21,6 +23,8 @@ public class DoseReader {
         final PeekingIterator<Event> it = Iterators.peekingIterator(new Yaml().parse(new InputStreamReader(new FileInputStream(args[0]))).iterator());
         check(it.next() instanceof StreamStartEvent);
         check(it.next() instanceof DocumentStartEvent);
+
+        List<SourcePackage> packages = new ArrayList<>(100);
 
         readMap(it, (key, ev) -> {
             switch (key) {
@@ -33,12 +37,14 @@ public class DoseReader {
                     break;
                 case "report":
                     check(ev instanceof SequenceStartEvent);
-                    readSeq(it, DoseReader::readSourcePackage, System.out::println);
+                    readSeq(it, DoseReader::readSourcePackage, packages::add);
                     break;
                 default:
                     throw new IllegalStateException(key);
             }
         });
+
+        System.out.println(packages.size());
         System.out.println(timer);
     }
 
@@ -110,7 +116,7 @@ public class DoseReader {
             }
         });
 
-        return pkg.name + "=" + pkg.version;
+        return pkg.toString();
     }
 
     private static <T> void readSeq(
