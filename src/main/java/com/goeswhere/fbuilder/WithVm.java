@@ -68,8 +68,8 @@ public class WithVm {
                     "deb-src " + MIRROR + " " + targetDist + " main contrib non-free'" +
                     " > /etc/apt/sources.list");
             in("apt-get", "update");
-            in("apt-get", "dist-upgrade", "-y");
-            in("apt-get", "install", "-y", "build-essential");
+            in("apt-get", "dist-upgrade", "-y", "--force-yes");
+            in("apt-get", "install", "-y", "--force-yes", "build-essential");
             stopPolitely();
         }
     }
