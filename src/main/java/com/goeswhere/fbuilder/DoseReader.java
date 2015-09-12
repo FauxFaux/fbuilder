@@ -11,9 +11,7 @@ import org.yaml.snakeyaml.events.*;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -23,9 +21,11 @@ public class DoseReader {
         final InputStreamReader reader = new InputStreamReader(new FileInputStream(args[0]));
 
         final Stopwatch timer = Stopwatch.createStarted();
-        List<SourcePackage> packages = new ArrayList<>(100);
-        readDebBuildCheckSourcePackages(reader, packages::add);
-        System.out.println(packages.size());
+        readDebBuildCheckSourcePackages(reader, sourcePackage -> {
+            if (sourcePackage.deps.contains("default-jdk:amd64=2:1.7-52")) {
+                System.out.println(sourcePackage.name);
+            }
+        });
         System.out.println(timer);
     }
 

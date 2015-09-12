@@ -15,5 +15,6 @@ repositories {
 dependencies {
     compile 'com.google.guava:guava:18.0'
     compile 'org.yaml:snakeyaml:1.16'
+    compile 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.6.1'
     testCompile 'junit:junit:4.12'
 }
