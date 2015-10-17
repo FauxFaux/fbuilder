@@ -4,6 +4,9 @@ import com.google.common.base.Joiner;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class WithVm {
@@ -107,7 +110,11 @@ public class WithVm {
         }
     }
 
-    private static ProcessBuilder setupExec(String... cmd) {
+    private static ProcessBuilder setupExec(String... request) {
+        final List<String> cmd = new ArrayList<>(Arrays.asList(request));
+        if (cmd.get(0).startsWith("lxc-")) {
+            cmd.add(0, "sudo");
+        }
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
         return builder;
