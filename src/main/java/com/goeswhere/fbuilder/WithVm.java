@@ -112,9 +112,9 @@ public class WithVm {
 
     private static ProcessBuilder setupExec(String... request) {
         final List<String> cmd = new ArrayList<>(Arrays.asList(request));
-        if (cmd.get(0).startsWith("lxc-")) {
-            cmd.add(0, "sudo");
-        }
+//        if (cmd.get(0).startsWith("lxc-")) {
+//            cmd.add(0, "sudo");
+//        }
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
         return builder;
