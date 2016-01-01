@@ -13,6 +13,7 @@ public class WithVm {
     private static final String HOSTNAME_TO_CHECK = "urika.home";
 
     private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":3142/ftp.debian.org/debian";
+    private static final boolean SUDO = true;
 
     final String vm;
     private final long mustBeDoneBy;
@@ -112,9 +113,9 @@ public class WithVm {
 
     private static ProcessBuilder setupExec(String... request) {
         final List<String> cmd = new ArrayList<>(Arrays.asList(request));
-//        if (cmd.get(0).startsWith("lxc-")) {
-//            cmd.add(0, "sudo");
-//        }
+        if (SUDO && cmd.get(0).startsWith("lxc-")) {
+            cmd.add(0, "sudo");
+        }
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
         return builder;
