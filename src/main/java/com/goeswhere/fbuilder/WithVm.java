@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class WithVm {
-    private static final String HOSTNAME_TO_CHECK = "urika";
+    private static final String HOSTNAME_TO_CHECK = "urika.home";
 
     private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":3142/ftp.debian.org/debian";
 
