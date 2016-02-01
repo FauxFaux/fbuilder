@@ -13,7 +13,7 @@ public class WithVm {
     private static final String HOSTNAME_TO_CHECK = "urika.home";
 
     private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":3142/ftp.debian.org/debian";
-    private static final boolean SUDO = true;
+    private static final boolean SUDO = false;
 
     final String vm;
     private final long mustBeDoneBy;
@@ -66,6 +66,14 @@ public class WithVm {
 //            String targetDist = "testing";
 
             exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", vm, "--", "-d", "debian", "-r", imageName, "-a", "amd64");
+            final File configFile = new File(new File(confDir(), vm), "config");
+            try (final BufferedWriter br = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(configFile, true), StandardCharsets.UTF_8))) {
+                br.newLine();
+                br.write("lxc.aa_allow_incomplete = 1");
+                br.newLine();
+
+            }
+
             start();
             shellIn("printf " +
                     "'deb " + MIRROR + " " + targetDist + " main contrib non-free\\n" +
@@ -75,6 +83,12 @@ public class WithVm {
             in("apt-get", "dist-upgrade", "-y", "--force-yes");
             in("apt-get", "install", "-y", "--force-yes", "build-essential");
             stopPolitely();
+        }
+    }
+
+    private String confDir() throws IOException {
+        try (final BufferedReader br = new BufferedReader(new InputStreamReader(setupExec("lxc-config", "lxc.lxcpath").start().getInputStream()))) {
+            return br.readLine();
         }
     }
 
