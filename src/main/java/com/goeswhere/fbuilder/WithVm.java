@@ -13,7 +13,6 @@ public class WithVm {
     private static final String HOSTNAME_TO_CHECK = "urika.home";
 
     private static final String MIRROR = "http://" + HOSTNAME_TO_CHECK + ":3142/ftp.debian.org/debian";
-    private static final boolean SUDO = false;
 
     final String vm;
     private final long mustBeDoneBy;
@@ -59,22 +58,16 @@ public class WithVm {
     }
 
     void createIfNotPresent() throws IOException, InterruptedException {
-        if (0 != execCode("lxc-info", "-n", vm)) {
+        if (0 != execCode("lxc", "info", vm)) {
             final String imageName = "sid";
             String targetDist = "sid";
 //            String imageName = "jessie";
 //            String targetDist = "testing";
 
-            exec("lxc-create", "-t", "download", "-B", "btrfs", "-n", vm, "--", "-d", "debian", "-r", imageName, "-a", "amd64");
-            final File configFile = new File(new File(confDir(), vm), "config");
-            try (final BufferedWriter br = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(configFile, true), StandardCharsets.UTF_8))) {
-                br.newLine();
-                br.write("lxc.aa_allow_incomplete = 1");
-                br.newLine();
+            exec("lxc", "launch", "images:debian/" + imageName + "/amd64", vm);
 
-            }
+            waitForStart();
 
-            start();
             shellIn("printf " +
                     "'deb " + MIRROR + " " + targetDist + " main contrib non-free\\n" +
                     "deb-src " + MIRROR + " " + targetDist + " main contrib non-free'" +
@@ -93,22 +86,25 @@ public class WithVm {
     }
 
     void start() throws IOException, InterruptedException {
-        exec("lxc-start", "-n", vm, "--logfile", "/tmp/a.log", "-l", "DEBUG");
-        exec("lxc-wait", "-n", vm, "-s", "RUNNING");
+        exec("lxc", "start", vm);
+        waitForStart();
+    }
+
+    void waitForStart() throws IOException, InterruptedException {
         shellIn("while ! arp " + HOSTNAME_TO_CHECK + "; do sleep 1; done");
     }
 
     private void stopPolitely() throws IOException, InterruptedException {
-        exec("lxc-stop", "-n", vm);
-        exec("lxc-wait", "-n", vm, "-s", "STOPPED");
+        exec("lxc", "stop", vm);
     }
 
     void stopNow() throws IOException, InterruptedException {
-        exec("lxc-stop", "-k", "-n", vm);
+        // TODO
+        stopPolitely();
     }
 
     void destroy() throws IOException, InterruptedException {
-        exec("lxc-destroy", "-n", vm);
+        exec("lxc", "destroy", vm);
     }
 
     private void shellIn(String command) throws IOException, InterruptedException {
@@ -127,16 +123,13 @@ public class WithVm {
 
     private static ProcessBuilder setupExec(String... request) {
         final List<String> cmd = new ArrayList<>(Arrays.asList(request));
-        if (SUDO && cmd.get(0).startsWith("lxc-")) {
-            cmd.add(0, "sudo");
-        }
         System.out.println("$ " + Joiner.on(' ').join(cmd));
         final ProcessBuilder builder = new ProcessBuilder(cmd);
         return builder;
     }
 
     private String[] attach(String[] args) {
-        return l("lxc-attach", "--clear-env", "-n", vm, "--", "env",
+        return l("lxc", "exec", vm, "--", "env",
                 "LANG=en_US.UTF-8",
                 "HOME=/tmp",
                 "LANGUAGE=en_US:en",
@@ -166,6 +159,6 @@ public class WithVm {
     }
 
     public void cloneFrom(String base) throws IOException, InterruptedException {
-        exec("lxc-clone", "-s", "-o", base, "-n", vm);
+        exec("lxc", "copy", base, vm);
     }
 }
