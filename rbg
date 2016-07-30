@@ -31,7 +31,7 @@ The package fails to build:
 $(cat $F)
 
 Full build log:
-https://reproducible.debian.net/rb-pkg/unstable/amd64/$P.html
+https://tests.reproducible-builds.org/debian/unstable/amd64/$P
 
 -- System Information:
 Debian Release: stretch/sid
