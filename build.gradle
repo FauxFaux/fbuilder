@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    compile 'com.google.guava:guava:18.0'
-    compile 'org.yaml:snakeyaml:1.16'
-    compile 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.6.1'
+    compile 'com.google.guava:guava:20.0'
+    compile 'org.yaml:snakeyaml:1.17'
+    compile 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.8.5'
     testCompile 'junit:junit:4.12'
 }
