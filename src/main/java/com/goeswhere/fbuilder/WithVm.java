@@ -104,7 +104,7 @@ public class WithVm {
     }
 
     void destroy() throws IOException, InterruptedException {
-        exec("lxc", "destroy", vm);
+        exec("lxc", "delete", "--force", vm);
     }
 
     private void shellIn(String command) throws IOException, InterruptedException {
