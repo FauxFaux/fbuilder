@@ -1,6 +1,6 @@
 ARCH ?= amd64
 
-all: dose-$(ARCH).yaml
+all: dose-$(ARCH).yaml essentials.list
 
 %.latest: $(wildcard $*/*)
 	docker build --tag=$*:latest $*
@@ -31,6 +31,8 @@ dose-yaml/sources: dose-yaml/Sources.xz
 	xz -d < $^ > $@
 	touch -r $^ $@
 
+essentials.list: sid-be.latest
+	docker run sid-be:latest dpkg --get-selections | awk '{print $$1}' | cut -d: -f 1 > essentials.list
 
 clean-cache:
 	docker pull debian:sid
