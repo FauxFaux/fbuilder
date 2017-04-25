@@ -1,5 +1,4 @@
 .idea
-classloadertest.iml
 .gradle
 build
 *.rbuild

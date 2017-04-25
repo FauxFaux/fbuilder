@@ -1,0 +1,37 @@
+#!/bin/zsh
+set -eu
+
+P=$1
+V=$2
+
+T=$(mktemp)
+trap "rm $T" EXIT
+
+cat >$T <<END
+From: "Chris West (Faux)" <solo-debianbugs@goeswhere.com>
+To: Debian Bug Tracking System <submit@bugs.debian.org>
+Subject: $P: FTBFS: 
+X-Debbugs-Cc: solo-debianbugs@goeswhere.com
+
+Source: $P
+Version: $V
+Severity: serious
+Justification: fails to build from source
+Tags: sid stretch
+User: reproducible-builds@lists.alioth.debian.org
+Usertags: ftbfs
+X-Debbugs-CC: reproducible-builds@lists.alioth.debian.org
+
+Dear Maintainer,
+
+The package fails to build:
+
+
+
+Full build log:
+https://tests.reproducible-builds.org/debian/unstable/amd64/$P
+
+END
+
+mutt -H $T submit@bugs.debian.org
+
