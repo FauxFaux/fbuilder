@@ -8,17 +8,12 @@ all: dose-$(ARCH).yaml
 dose.latest: sid-be.latest
 
 
-# can't use --uild-arg or --env to affect CMD, so do it in make :(
+# build is run twice just so there's some progress reporting
 dose-%.yaml: dose.latest dose-yaml/%/packages dose-yaml/sources
-	$(eval D:=$(shell mktemp -d))
-	-docker run \
-		-v $(D):/tmp/out \
+	docker build --build-arg arch=$(ARCH) dose-yaml
+	docker cp $(shell docker run -d \
 		$(shell docker build --quiet --build-arg arch=$(ARCH) dose-yaml) \
-		deb-buildcheck --deb-ignore-essential --explain --successes --deb-native-arch=$(ARCH) \
-			/tmp/packages /tmp/sources \
-			--outfile=/tmp/out/dose
-	mv $(D)/dose $@
-	$(RM) -rf $(D)
+		true):/tmp/buildcheck $@
 
 # directory layout here to work around wget -O -N being a bit dumb
 dose-yaml/%/Packages.xz:
