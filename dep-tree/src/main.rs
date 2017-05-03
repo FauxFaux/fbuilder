@@ -9,6 +9,7 @@ use std::io;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use futures::Future;
 use futures_cpupool::CpuPool;
@@ -75,43 +76,60 @@ fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
     Ok((namer, map))
 }
 
+type DomResult = Option<HashSet<PkgId>>;
+
+fn find_dominators(bin: PkgId, map: Arc<HashMap<PkgId, HashSet<PkgId>>>) -> DomResult {
+    let mut found: Option<HashSet<PkgId>> = None;
+
+    for deps in map.values() {
+        if !deps.contains(&bin) {
+            continue;
+        }
+
+        if let Some(ref mut so_far) = found {
+            so_far.retain(|x| deps.contains(x));
+        } else {
+            let mut initial = deps.clone();
+            initial.remove(&bin);
+            found = Some(initial);
+            continue;
+        }
+
+    }
+    found
+}
+
 fn main() {
     let (namer, map) = load().expect("loading file");
+    let mappy = Arc::new(map);
+
     let names = namer.reverse();
 
     let mut all_bins = HashSet::with_capacity(names.len());
-    for bins in map.values() {
+    for bins in mappy.values() {
         for bin in bins {
             all_bins.insert(bin);
         }
     }
 
     let pool = CpuPool::new_num_cpus();
+    let mut work = Vec::with_capacity(all_bins.len());
 
     for bin in all_bins {
-        let mut found: Option<HashSet<PkgId>> = None;
+        let bin = *bin;
+        let mappy = mappy.clone();
+        work.push(pool.spawn_fn(move || {
+            Ok::<(PkgId, DomResult), ()>((bin, find_dominators(bin, mappy)))
+        }));
+    }
 
-        for deps in map.values() {
-            if !deps.contains(bin) {
-                continue;
-            }
-
-            if let Some(ref mut so_far) = found {
-                so_far.retain(|x| deps.contains(x));
-            } else {
-                let mut initial = deps.clone();
-                initial.remove(bin);
-                found = Some(initial);
-                continue;
-            }
-
-        }
-
-        let deps = found.unwrap();
+    for future in work {
+        let found = future.wait().unwrap();
+        let (bin, deps) = found;
+        let deps = deps.unwrap();
         if deps.len() < 10 {
-            println!("{}: {:?}", names[bin], deps.iter().map(|id|
+            println!("{}: {:?}", names[&bin], deps.iter().map(|id|
                         names[id].clone()).collect::<Vec<String>>());
         }
     }
-
 }
