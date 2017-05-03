@@ -1,4 +1,6 @@
 #![feature(io)]
+#![feature(retain_hash_collection)]
+#![feature(vec_remove_item)]
 
 extern crate yaml_rust;
 
@@ -163,23 +165,44 @@ fn main() {
 
     let file = fs::File::open(input_path).expect("input file must be readable");
     let mut parser = Parser::new(io::BufReader::new(file).chars().map(|r| r.expect("file read as utf-8")));
-    let mut pass = FirstPass::new(ignored);
+    let mut pass = FirstPass::new(ignored.clone());
     parser.load(&mut pass, false).expect("yaml parse successs");
     let packages = pass.packages;
-    let mut counter = HashMap::with_capacity(30_000);
-    for deps in packages.values() {
-        for dep in deps {
-            *counter.entry(dep).or_insert(0) += 1;
-        }
+
+    let mut extra_essential: HashSet<String> = packages.values()
+        .nth(0).expect("at least one package")
+        .iter().map(|s| s.clone()).collect();
+
+    for dep in packages.values() {
+        extra_essential.retain(|pkg| dep.contains(pkg));
     }
-    for (src, deps) in packages.iter() {
-        print!("{}\t", src);
-        let mut new = deps.clone();
-        new.sort_by_key(|dep| -counter[dep]);
-        for item in new {
-            print!("{} ", item);
+
+    for ignoree in ignored {
+        extra_essential.insert(ignoree);
+    }
+
+    let mut sorted: Vec<&String> = extra_essential.iter().collect();
+    sorted.sort();
+
+    println!("_essential:");
+    for extra in sorted {
+        println!(" - {}", extra);
+    }
+
+    let mut keys: Vec<&String> = packages.keys().collect();
+    keys.sort();
+
+    for src in keys.iter() {
+        println!("{}:", src);
+
+        let mut new = packages[src.as_str()].clone();
+        for extra in extra_essential.iter() {
+            new.remove_item(&extra);
         }
-        println!();
+        new.sort();
+        for item in new {
+            println!(" - {}", item);
+        }
     }
 }
 
