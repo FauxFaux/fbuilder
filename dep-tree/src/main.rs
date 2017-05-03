@@ -10,29 +10,13 @@ use std::collections::HashSet;
 // magic:
 use std::io::BufRead;
 
-struct StringPool {
-    pool: HashMap<String, String>,
-}
-
-impl StringPool {
-    fn new() -> StringPool {
-        StringPool {
-            pool: HashMap::with_capacity(30_000),
-        }
-    }
-
-    fn fixup(&mut self, s: &str) -> &String {
-        &*self.pool.entry(s.to_string()).or_insert_with(|| s.to_string())
-    }
-}
-
-fn load<'a>() -> io::Result<HashMap<String, HashSet<&'a String>>> {
+fn load() -> io::Result<(HashSet<String>, HashMap<String, HashSet<String>>)> {
     let input_path = env::args().nth(1).expect("first argument: input file");
     let file = io::BufReader::new(fs::File::open(input_path)?);
     let mut key: String = "".to_string();
-    let mut set: HashSet<&String> = HashSet::new();
-    let mut map: HashMap<String, HashSet<&String>> = HashMap::with_capacity(30_000);
-    let mut all = StringPool::new();
+    let mut set: HashSet<String> = HashSet::new();
+    let mut map: HashMap<String, HashSet<String>> = HashMap::with_capacity(30_000);
+    let mut all = HashSet::new();
     for line in file.lines() {
         let line = line?;
         if line.ends_with(":") {
@@ -44,14 +28,21 @@ fn load<'a>() -> io::Result<HashMap<String, HashSet<&'a String>>> {
             continue;
         }
         assert_eq!(" - ", &line[0..3]);
-        set.insert(all.fixup(&line[3..]));
+        if key.bytes().nth(0).expect("key must have been seen") == b'_' {
+            continue;
+        }
+
+        let pkg = line[3..].to_string();
+        set.insert(pkg.clone());
+        all.insert(pkg);
     }
 
-    Ok(map)
+    Ok((all, map))
 }
 
 fn main() {
-    let map = load().expect("loading file");
+    let (all, map) = load().expect("loading file");
     println!("{}", map.len());
+    println!("{}", all.len());
     println!("{:?}", map.keys().nth(0));
 }
