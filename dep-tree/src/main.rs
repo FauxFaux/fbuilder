@@ -1,9 +1,17 @@
+#![feature(retain_hash_collection)]
+
+extern crate futures;
+extern crate futures_cpupool;
+
 use std::env;
 use std::fs;
 use std::io;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+
+use futures::Future;
+use futures_cpupool::CpuPool;
 
 // magic:
 use std::io::BufRead;
@@ -41,7 +49,7 @@ fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
     let mut key: PkgId = 0;
     let mut set: HashSet<PkgId> = HashSet::new();
     let mut map: HashMap<PkgId, HashSet<PkgId>> = HashMap::with_capacity(30_000);
-    let mut all = PkgIdLookup {
+    let mut namer = PkgIdLookup {
         cache: HashMap::new(),
     };
     for line in file.lines() {
@@ -51,7 +59,7 @@ fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
                 map.insert(key, set.clone());
                 set.clear();
             }
-            key = all.id_of(&line[0..line.len()-1]);
+            key = namer.id_of(&line[0..line.len()-1]);
             continue;
         }
         assert_eq!(" - ", &line[0..3]);
@@ -61,15 +69,49 @@ fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
             continue;
         }
 
-        set.insert(all.id_of(&line[3..]));
+        set.insert(namer.id_of(&line[3..]));
     }
 
-    Ok((all, map))
+    Ok((namer, map))
 }
 
 fn main() {
-    let (all, map) = load().expect("loading file");
-    println!("{}", map.len());
-    println!("{}", all.len());
-    println!("{}", all.reverse()[map.keys().nth(0).unwrap()]);
+    let (namer, map) = load().expect("loading file");
+    let names = namer.reverse();
+
+    let mut all_bins = HashSet::with_capacity(names.len());
+    for bins in map.values() {
+        for bin in bins {
+            all_bins.insert(bin);
+        }
+    }
+
+    let pool = CpuPool::new_num_cpus();
+
+    for bin in all_bins {
+        let mut found: Option<HashSet<PkgId>> = None;
+
+        for deps in map.values() {
+            if !deps.contains(bin) {
+                continue;
+            }
+
+            if let Some(ref mut so_far) = found {
+                so_far.retain(|x| deps.contains(x));
+            } else {
+                let mut initial = deps.clone();
+                initial.remove(bin);
+                found = Some(initial);
+                continue;
+            }
+
+        }
+
+        let deps = found.unwrap();
+        if deps.len() < 10 {
+            println!("{}: {:?}", names[bin], deps.iter().map(|id|
+                        names[id].clone()).collect::<Vec<String>>());
+        }
+    }
+
 }
