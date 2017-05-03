@@ -7,6 +7,7 @@ use std::fs;
 use std::io;
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 use yaml_rust::parser::*;
 
@@ -43,9 +44,10 @@ impl Package {
         !self.name.is_empty() && !self.version.is_empty()
     }
 
-    fn print(&self) {
+    fn to_string(&self) -> String {
         assert!(self.is_set());
-        print!("{}:{}", self.name, self.version);
+        //format!("{}:{}", self.name, self.version)
+        self.name.clone()
     }
 }
 
@@ -55,6 +57,8 @@ struct FirstPass {
     dep: Package,
     map_state: NextIs,
     ignored: HashSet<String>,
+    deps: Vec<String>,
+    packages: HashMap<String, Vec<String>>,
 }
 
 impl FirstPass {
@@ -65,6 +69,8 @@ impl FirstPass {
             dep: Package::new(),
             map_state: NextIs::Key,
             ignored,
+            deps: Vec::with_capacity(200),
+            packages: HashMap::with_capacity(30_000),
         }
     }
 
@@ -94,16 +100,18 @@ impl EventReceiver for FirstPass {
             },
             &Event::MappingEnd => {
                 if 3 == self.depth && self.dep.is_set() && !self.ignored.contains(&self.dep.name) {
-                    self.source.print();
-                    print!("\t");
-                    self.dep.print();
-                    println!();
+                    self.deps.push(self.dep.to_string());
                 }
                 self.depth -= 1;
                 self.dep.clear();
             }
             &Event::SequenceStart ( 0 ) => {},
-            &Event::SequenceEnd => {}
+            &Event::SequenceEnd => {
+                if 2 == self.depth {
+                    self.packages.insert(self.source.to_string(), self.deps.clone());
+                    self.deps.clear();
+                }
+            }
             &Event::Scalar ( ref label, _, 0, None ) => {
                 match self.map_state {
                     NextIs::Key => {
@@ -157,5 +165,21 @@ fn main() {
     let mut parser = Parser::new(io::BufReader::new(file).chars().map(|r| r.expect("file read as utf-8")));
     let mut pass = FirstPass::new(ignored);
     parser.load(&mut pass, false).expect("yaml parse successs");
+    let packages = pass.packages;
+    let mut counter = HashMap::with_capacity(30_000);
+    for deps in packages.values() {
+        for dep in deps {
+            *counter.entry(dep).or_insert(0) += 1;
+        }
+    }
+    for (src, deps) in packages.iter() {
+        print!("{}\t", src);
+        let mut new = deps.clone();
+        new.sort_by_key(|dep| -counter[dep]);
+        for item in new {
+            print!("{} ", item);
+        }
+        println!();
+    }
 }
 
