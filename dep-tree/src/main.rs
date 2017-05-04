@@ -99,34 +99,6 @@ fn find_dominators(bin: PkgId, map: Arc<HashMap<PkgId, HashSet<PkgId>>>) -> DomR
     found
 }
 
-fn par_map<IS, S, D, F, C>(wut: IS, with: F, captures: C) -> Vec<D>
-where IS: Iterator<Item=S>,
-      S: Send,
-      D: Send,
-      F: 'static + Send + Fn(C, S) -> D,
-      C: 'static + Clone + Send,
-       {
-
-    let pool = CpuPool::new_num_cpus();
-    let mut work = Vec::new();
-
-    for item in wut {
-        let captures = captures.clone();
-        work.push(pool.spawn_fn(move || 
-            Ok::<D, ()>(with(captures, item))
-        ));
-    }
-
-    // TODO: don't really get why this can't be a map:
-    //return work.iter().map(|ref future| future.wait().unwrap()).collect();
-
-    let mut ret = Vec::with_capacity(work.len());
-    for future in work {
-        ret.push(future.wait().unwrap());
-    }
-    ret
-}
-
 fn main() {
     let (namer, map) = load().expect("loading file");
     let mappy = Arc::new(map);
@@ -141,7 +113,17 @@ fn main() {
     }
 
     let pool = CpuPool::new_num_cpus();
-    for found in par_map(all_bins.iter(), |mappy, bin| (bin, find_dominators(*bin, mappy)), mappy) {
+    let mut work = Vec::with_capacity(all_bins.len());
+
+    for bin in all_bins {
+        let mappy = mappy.clone();
+        work.push(pool.spawn_fn(move || {
+            Ok::<(PkgId, DomResult), ()>((bin, find_dominators(bin, mappy)))
+        }));
+    }
+
+    for future in work {
+        let found = future.wait().unwrap();
         let (bin, deps) = found;
         let deps = deps.unwrap();
         if deps.len() < 10 {
