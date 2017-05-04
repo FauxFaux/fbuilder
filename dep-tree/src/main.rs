@@ -257,11 +257,11 @@ fn render(pkg: PkgId, instructions: &Instructions, names: &HashMap<PkgId, String
     writeln!(out, "WORKDIR /build")?;
 
     for instruction in instructions {
-        write!(out, "RUN apt-get install -y --no-install-recommends && apt-get clean")?;
+        write!(out, "RUN apt-get install -y --no-install-recommends")?;
         for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
             write!(out, " {}", dep)?;
         }
-        writeln!(out)?;
+        writeln!(out, " && apt-get clean")?;
     }
     writeln!(out, "RUN apt-get source {}", names[&pkg])?;
     Ok(())
