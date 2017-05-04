@@ -1,5 +1,6 @@
 #![feature(retain_hash_collection)]
 
+extern crate rand;
 extern crate futures;
 extern crate futures_cpupool;
 
@@ -16,6 +17,7 @@ use futures_cpupool::CpuPool;
 
 // magic:
 use std::io::BufRead;
+use rand::distributions::IndependentSample;
 
 type PkgId = u16;
 
@@ -187,16 +189,42 @@ impl State {
         ret
     }
 
+    fn next_guess(&self) -> PkgId {
+
+        let mut counter = HashMap::with_capacity(self.outstanding.len());
+        let mut count = 0;
+        for deps in self.outstanding.values() {
+            for dep in deps {
+                *counter.entry(*dep).or_insert(0) += 1u32;
+                count += 1u32;
+            }
+        }
+
+        let mut rng = rand::thread_rng();
+        let mut pos = rand::distributions::Range::new(0, count).ind_sample(&mut rng);
+
+        let mut it = counter.iter();
+        while let Some((pkg, count)) = it.next() {
+            if pos < *count {
+                return *pkg;
+            }
+            pos -= *count;
+        }
+
+        panic!("ran out of iterator before we ran out of points");
+    }
+
     fn print(&self, names: &HashMap<PkgId, String>)
         //TODO: where N: std::ops::Index<PkgId, Output=String>
     {
         println!("State [ remaining packages: {}, install steps: ", self.outstanding.len());
         for (idx, ins) in self.instructions.iter().enumerate() {
-            print!(" - step {}: apt install ", idx);
+            print!(" - step {}: apt install", idx);
             for pkg in &ins.install {
                 print!(" {}", names[&pkg]);
             }
-            println!("   happy: ");
+            println!();
+            print!("   happy:");
             for pkg in &ins.satisfies {
                 print!(" {}", names[&pkg]);
             }
@@ -210,12 +238,21 @@ fn main() {
     let (namer, map) = load().expect("loading file");
     let names = namer.reverse();
 
-    let mut ours = State::new(map);
-    loop {
-        let (or, _) = ours.install(*ours.outstanding_bins().iter().next().unwrap());
-        ours = or;
+    let init = State::new(map);
+    let mut to_do = vec![init];
 
-        ours.print(&names);
+    while let Some(state) = to_do.pop() {
+        let pick = state.next_guess();
+        let (left, right) = state.install(pick);
+        if !right.outstanding.is_empty() {
+            to_do.push(right);
+        }
+
+        if left.outstanding.is_empty() {
+            left.print(&names);
+        } else {
+            to_do.push(left);
+        }
     }
 }
 
