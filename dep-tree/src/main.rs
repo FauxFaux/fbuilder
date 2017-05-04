@@ -23,6 +23,8 @@ struct PkgIdLookup {
     cache: HashMap<String, PkgId>,
 }
 
+type OutstandingDeps = HashMap<PkgId, HashSet<PkgId>>;
+
 impl PkgIdLookup {
     fn id_of(&mut self, pkg: &str) -> PkgId {
         let len = self.cache.len();
@@ -35,6 +37,10 @@ impl PkgIdLookup {
         *self.cache.entry(pkg.to_string()).or_insert(len as PkgId)
     }
 
+    fn get(&self, pkg: &str) -> PkgId {
+        self.cache[pkg]
+    }
+
     fn len(&self) -> usize {
         self.cache.len()
     }
@@ -44,12 +50,12 @@ impl PkgIdLookup {
     }
 }
 
-fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
+fn load() -> io::Result<(PkgIdLookup, OutstandingDeps)> {
     let input_path = env::args().nth(1).expect("first argument: input file");
     let file = io::BufReader::new(fs::File::open(input_path)?);
     let mut key: PkgId = 0;
     let mut set: HashSet<PkgId> = HashSet::new();
-    let mut map: HashMap<PkgId, HashSet<PkgId>> = HashMap::with_capacity(30_000);
+    let mut map: OutstandingDeps = HashMap::with_capacity(30_000);
     let mut namer = PkgIdLookup {
         cache: HashMap::new(),
     };
@@ -78,7 +84,7 @@ fn load() -> io::Result<(PkgIdLookup, HashMap<PkgId, HashSet<PkgId>>)> {
 
 type DomResult = Option<HashSet<PkgId>>;
 
-fn find_dominators(bin: PkgId, map: Arc<HashMap<PkgId, HashSet<PkgId>>>) -> DomResult {
+fn find_dominators(bin: PkgId, map: Arc<OutstandingDeps>) -> DomResult {
     let mut found: Option<HashSet<PkgId>> = None;
 
     for deps in map.values() {
@@ -99,10 +105,122 @@ fn find_dominators(bin: PkgId, map: Arc<HashMap<PkgId, HashSet<PkgId>>>) -> DomR
     found
 }
 
+#[derive(Debug, Clone)]
+struct Instruction {
+    install: HashSet<PkgId>,
+    satisfies: HashSet<PkgId>,
+}
+
+#[derive(Debug)]
+struct State {
+    instructions: Vec<Instruction>,
+    outstanding: OutstandingDeps,
+}
+
+impl State {
+    fn new(outstanding: OutstandingDeps) -> State {
+        State {
+            instructions: Vec::new(),
+            outstanding
+        }
+    }
+
+    fn install(&self, dep: PkgId) -> (State, State) {
+        let mut ours: OutstandingDeps = HashMap::new();
+        let mut others: OutstandingDeps = HashMap::new();
+
+        for (pkg, ref mut deps) in &self.outstanding {
+            if deps.contains(&dep) {
+                ours.insert(*pkg, deps.clone());
+            } else {
+                others.insert(*pkg, deps.clone());
+            }
+        }
+
+        assert_ne!(0, ours.len());
+
+        let mut common_deps = ours.values().next().unwrap().clone();
+        for (_, ref mut deps) in &mut ours {
+            deps.remove(&dep);
+            common_deps.retain(|x| deps.contains(x));
+        }
+
+        let mut satisfied = HashSet::new();
+
+        for (pkg, ref mut deps) in &mut ours {
+            for dep in &common_deps {
+                deps.remove(&dep);
+            }
+            if 0 == deps.len() {
+                satisfied.insert(*pkg);
+            }
+        }
+
+        for pkg in &satisfied {
+            ours.remove(&pkg);
+        }
+
+        common_deps.insert(dep);
+
+        let mut new_instructions = self.instructions.clone();
+        new_instructions.push(Instruction {
+               satisfies: satisfied,
+               install: common_deps,
+        });
+
+        (State {
+            outstanding: ours,
+            instructions: new_instructions,
+        }, State {
+            outstanding: others,
+            instructions: self.instructions.clone(),
+        })
+    }
+
+    fn outstanding_bins(&self) -> HashSet<PkgId> {
+        let mut ret = HashSet::with_capacity(self.outstanding.len());
+        for deps in self.outstanding.values() {
+            for dep in deps {
+                ret.insert(*dep);
+            }
+        }
+        ret
+    }
+
+    fn print(&self, names: &HashMap<PkgId, String>)
+        //TODO: where N: std::ops::Index<PkgId, Output=String>
+    {
+        println!("State [ remaining packages: {}, install steps: ", self.outstanding.len());
+        for (idx, ins) in self.instructions.iter().enumerate() {
+            print!(" - step {}: apt install ", idx);
+            for pkg in &ins.install {
+                print!(" {}", names[&pkg]);
+            }
+            println!("   happy: ");
+            for pkg in &ins.satisfies {
+                print!(" {}", names[&pkg]);
+            }
+            println!();
+        }
+        println!("]");
+    }
+}
+
 fn main() {
     let (namer, map) = load().expect("loading file");
-    let mappy = Arc::new(map);
+    let names = namer.reverse();
 
+    let mut ours = State::new(map);
+    loop {
+        let (or, _) = ours.install(*ours.outstanding_bins().iter().next().unwrap());
+        ours = or;
+
+        ours.print(&names);
+    }
+}
+
+fn dominators(map: OutstandingDeps, namer: PkgIdLookup) {
+    let mappy = Arc::new(map);
     let names = namer.reverse();
 
     let mut all_bins = HashSet::with_capacity(names.len());
@@ -132,3 +250,46 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use PkgId;
+    use State;
+
+    use HashSet;
+    use HashMap;
+
+    fn set_of(args: &[PkgId]) -> HashSet<PkgId> {
+        let mut ret = HashSet::with_capacity(args.len());
+        for arg in args {
+            ret.insert(*arg);
+        }
+        ret
+    }
+
+    #[test]
+    fn install() {
+        let mut out = HashMap::new();
+        out.insert(1, set_of(&[12, 13]));
+        out.insert(2, set_of(&[12, 13, 14]));
+        out.insert(3, set_of(&[12, 13, 14, 16]));
+        out.insert(4, set_of(&[11]));
+        out.insert(5, set_of(&[13]));
+        let initial = State::new(out);
+        let (ours, theirs) = initial.install(12);
+        assert_eq!(1, ours.instructions.len());
+        assert_eq!(set_of(&[12, 13]), ours.instructions[0].install);
+        assert_eq!(set_of(&[1]), ours.instructions[0].satisfies);
+        assert_eq!(set_of(&[2, 3]), ours.outstanding.keys().map(|x| *x).collect());
+        // TODO: vals of outstanding
+
+        let (ours, theirs) = ours.install(14);
+        assert_eq!(2, ours.instructions.len());
+        assert_eq!(set_of(&[14]), ours.instructions[1].install);
+        assert_eq!(set_of(&[2]), ours.instructions[1].satisfies);
+        assert_eq!(set_of(&[3]), ours.outstanding.keys().map(|x| *x).collect());
+
+        assert_eq!(set_of(&[16]), ours.outstanding_bins());
+    }
+}
+
