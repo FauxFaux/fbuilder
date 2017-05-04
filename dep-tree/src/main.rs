@@ -114,7 +114,7 @@ struct Instruction {
     satisfies: HashSet<PkgId>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct State {
     instructions: Vec<Instruction>,
     outstanding: OutstandingDeps,
@@ -243,13 +243,29 @@ where I: Iterator<Item=T>,
     ret
 }
 
+fn render(pkg: PkgId, instructions: &Vec<Instruction>, names: &HashMap<PkgId, String>) {
+    let mut out = fs::File::create(
+            format!("target/{}.Dockerfile", names[&pkg])
+        ).expect("create output");
 
-fn main() {
-    let (namer, map) = load().expect("loading file");
-    let names = namer.reverse();
+    writeln!(out, "FROM sid-be:latest");
+    writeln!(out, "WORKDIR /build");
 
-    let init = State::new(map);
-    let mut to_do = vec![init];
+    for instruction in instructions {
+        write!(out, "RUN apt-get install -y --no-install-recommends");
+        for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
+            write!(out, " {}", dep);
+        }
+        writeln!(out);
+    }
+    writeln!(out, "RUN apt-get source {}", names[&pkg]);
+}
+
+fn divide_up(state: State) -> (usize, Vec<(PkgId, Vec<Instruction>)>) {
+    let mut to_do = vec![state];
+
+    let mut bid = 0usize;
+    let mut result = Vec::with_capacity(to_do[0].outstanding.len());
 
     while let Some(state) = to_do.pop() {
         let pick = state.next_guess();
@@ -261,26 +277,35 @@ fn main() {
         {
             let satisfied = &left.instructions[left.instructions.len() - 1].satisfies;
             for pkg in satisfied {
-                let mut out = fs::File::create(
-                        format!("target/{}.Dockerfile", names[pkg])
-                    ).expect("create output");
-
-                writeln!(out, "FROM sid-be:latest");
-                writeln!(out, "WORKDIR /build");
-
-                for instruction in &left.instructions {
-                    write!(out, "RUN apt-get install -y --no-install-recommends");
-                    for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
-                        write!(out, " {}", dep);
-                    }
-                    writeln!(out);
-                }
-                writeln!(out, "RUN apt-get source {}", names[pkg]);
+                result.push((*pkg, left.instructions.clone()));
+                bid += left.instructions.len();
             }
         }
 
         if !left.outstanding.is_empty() {
             to_do.push(left);
+        }
+    }
+
+    (bid, result)
+}
+
+fn main() {
+    let (namer, map) = load().expect("loading file");
+    let names = namer.reverse();
+
+    let init = State::new(map);
+    let mut best_bid = std::usize::MAX;
+    loop {
+        let (bid, solution) = divide_up(init.clone());
+        if bid < best_bid {
+            best_bid = bid;
+            for (pkg, instructions) in solution {
+                render(pkg, &instructions, &names);
+            }
+            println!("new winner! {}", bid);
+        } else {
+            println!("loser: {}", bid);
         }
     }
 }
