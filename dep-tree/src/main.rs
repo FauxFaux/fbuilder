@@ -17,6 +17,7 @@ use futures_cpupool::CpuPool;
 
 // magic:
 use std::io::BufRead;
+use std::io::Write;
 use rand::distributions::IndependentSample;
 
 type PkgId = u16;
@@ -166,7 +167,7 @@ impl State {
 
         let mut new_instructions = self.instructions.clone();
         new_instructions.push(Instruction {
-               satisfies: satisfied,
+               satisfies: satisfied.clone(),
                install: common_deps,
         });
 
@@ -234,6 +235,15 @@ impl State {
     }
 }
 
+fn sorted<I, T>(it: I) -> Vec<T>
+where I: Iterator<Item=T>,
+      T: Ord {
+    let mut ret: Vec<T> = it.collect();
+    ret.sort();
+    ret
+}
+
+
 fn main() {
     let (namer, map) = load().expect("loading file");
     let names = namer.reverse();
@@ -248,9 +258,28 @@ fn main() {
             to_do.push(right);
         }
 
-        if left.outstanding.is_empty() {
-            left.print(&names);
-        } else {
+        {
+            let satisfied = &left.instructions[left.instructions.len() - 1].satisfies;
+            for pkg in satisfied {
+                let mut out = fs::File::create(
+                        format!("target/{}.Dockerfile", names[pkg])
+                    ).expect("create output");
+
+                writeln!(out, "FROM sid-be:latest");
+                writeln!(out, "WORKDIR /build");
+
+                for instruction in &left.instructions {
+                    write!(out, "RUN apt-get install -y --no-install-recommends");
+                    for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
+                        write!(out, " {}", dep);
+                    }
+                    writeln!(out);
+                }
+                writeln!(out, "RUN apt-get source {}", names[pkg]);
+            }
+        }
+
+        if !left.outstanding.is_empty() {
             to_do.push(left);
         }
     }
