@@ -257,7 +257,7 @@ fn render(pkg: PkgId, instructions: &Instructions, names: &HashMap<PkgId, String
     writeln!(out, "WORKDIR /build")?;
 
     for instruction in instructions {
-        write!(out, "RUN apt-get install -y --no-install-recommends")?;
+        write!(out, "RUN apt-get install -y --no-install-recommends && apt-get clean")?;
         for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
             write!(out, " {}", dep)?;
         }
@@ -270,7 +270,6 @@ fn render(pkg: PkgId, instructions: &Instructions, names: &HashMap<PkgId, String
 fn divide_up(state: State) -> (usize, Vec<(PkgId, Instructions)>) {
     let mut to_do = vec![state];
 
-    let mut bid = 0usize;
     let mut result = Vec::with_capacity(to_do[0].outstanding.len());
 
     while let Some(state) = to_do.pop() {
@@ -284,12 +283,19 @@ fn divide_up(state: State) -> (usize, Vec<(PkgId, Instructions)>) {
             let satisfied = &left.instructions[left.instructions.len() - 1].satisfies;
             for pkg in satisfied {
                 result.push((*pkg, left.instructions.clone()));
-                bid += left.instructions.len();
             }
         }
 
         if !left.outstanding.is_empty() {
             to_do.push(left);
+        }
+    }
+
+    let mut bid = 0usize;
+    for tuple in &result {
+        let &(_, ref instructions) = tuple;
+        for instruction in instructions {
+            bid += Rc::strong_count(&instruction);
         }
     }
 
@@ -300,7 +306,7 @@ fn main() {
     let (namer, map) = load().expect("loading file");
     let names = Arc::new(namer.reverse());
 
-    let best_bid = Arc::new(Mutex::new(std::usize::MAX));
+    let best_bid = Arc::new(Mutex::new(0usize));
 
     for _ in 0..num_cpus::get() {
         let map = map.clone();
@@ -311,7 +317,7 @@ fn main() {
             loop {
                 let (bid, solution) = divide_up(init.clone());
                 let mut best_bid = best_bid.lock().expect("no poison");
-                if bid < *best_bid {
+                if bid > *best_bid {
                     print!("new winner: {}... ", bid);
                     io::stdout().flush().expect("writing");
                     *best_bid = bid;
