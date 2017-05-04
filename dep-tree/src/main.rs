@@ -108,7 +108,7 @@ fn main() {
     let mut all_bins = HashSet::with_capacity(names.len());
     for bins in mappy.values() {
         for bin in bins {
-            all_bins.insert(bin);
+            all_bins.insert(*bin);
         }
     }
 
@@ -116,7 +116,6 @@ fn main() {
     let mut work = Vec::with_capacity(all_bins.len());
 
     for bin in all_bins {
-        let bin = *bin;
         let mappy = mappy.clone();
         work.push(pool.spawn_fn(move || {
             Ok::<(PkgId, DomResult), ()>((bin, find_dominators(bin, mappy)))
