@@ -11,6 +11,7 @@ use std::io;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -116,9 +117,11 @@ struct Instruction {
     satisfies: HashSet<PkgId>,
 }
 
+type Instructions = Vec<Rc<Instruction>>;
+
 #[derive(Debug, Clone)]
 struct State {
-    instructions: Vec<Instruction>,
+    instructions: Instructions,
     outstanding: OutstandingDeps,
 }
 
@@ -168,10 +171,10 @@ impl State {
         common_deps.insert(dep);
 
         let mut new_instructions = self.instructions.clone();
-        new_instructions.push(Instruction {
+        new_instructions.push(Rc::new(Instruction {
                satisfies: satisfied.clone(),
                install: common_deps,
-        });
+        }));
 
         (State {
             outstanding: ours,
@@ -245,25 +248,26 @@ where I: Iterator<Item=T>,
     ret
 }
 
-fn render(pkg: PkgId, instructions: &Vec<Instruction>, names: &HashMap<PkgId, String>) {
+fn render(pkg: PkgId, instructions: &Instructions, names: &HashMap<PkgId, String>) -> io::Result<()> {
     let mut out = fs::File::create(
             format!("target/{}.Dockerfile", names[&pkg])
-        ).expect("create output");
+        )?;
 
-    writeln!(out, "FROM sid-be:latest");
-    writeln!(out, "WORKDIR /build");
+    writeln!(out, "FROM sid-be:latest")?;
+    writeln!(out, "WORKDIR /build")?;
 
     for instruction in instructions {
-        write!(out, "RUN apt-get install -y --no-install-recommends");
+        write!(out, "RUN apt-get install -y --no-install-recommends")?;
         for dep in sorted(instruction.install.iter().map(|ref dep| names[dep].to_string())) {
-            write!(out, " {}", dep);
+            write!(out, " {}", dep)?;
         }
-        writeln!(out);
+        writeln!(out)?;
     }
-    writeln!(out, "RUN apt-get source {}", names[&pkg]);
+    writeln!(out, "RUN apt-get source {}", names[&pkg])?;
+    Ok(())
 }
 
-fn divide_up(state: State) -> (usize, Vec<(PkgId, Vec<Instruction>)>) {
+fn divide_up(state: State) -> (usize, Vec<(PkgId, Instructions)>) {
     let mut to_do = vec![state];
 
     let mut bid = 0usize;
@@ -296,23 +300,25 @@ fn main() {
     let (namer, map) = load().expect("loading file");
     let names = namer.reverse();
 
-    let init = State::new(map);
     let best_bid = Arc::new(Mutex::new(std::usize::MAX));
 
     for i in 0..num_cpus::get() {
-        let init = init.clone();
+        let map = map.clone();
         let best_bid = best_bid.clone();
         let names = names.clone();
         std::thread::spawn(move || {
+            let init = State::new(map);
             loop {
                 let (bid, solution) = divide_up(init.clone());
                 let mut best_bid = best_bid.lock().expect("no poison");
                 if bid < *best_bid {
+                    print!("new winner: {}... ", bid);
+                    io::stdout().flush();
                     *best_bid = bid;
                     for (pkg, instructions) in solution {
                         render(pkg, &instructions, &names);
                     }
-                    println!("new winner! {}", bid);
+                    println!("written.");
                 } else {
                     println!("loser: {}", bid);
                 }
