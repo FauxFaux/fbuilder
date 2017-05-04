@@ -3,6 +3,7 @@
 extern crate rand;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate num_cpus;
 
 use std::env;
 use std::fs;
@@ -11,6 +12,7 @@ use std::io;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use futures::Future;
 use futures_cpupool::CpuPool;
@@ -295,19 +297,31 @@ fn main() {
     let names = namer.reverse();
 
     let init = State::new(map);
-    let mut best_bid = std::usize::MAX;
-    loop {
-        let (bid, solution) = divide_up(init.clone());
-        if bid < best_bid {
-            best_bid = bid;
-            for (pkg, instructions) in solution {
-                render(pkg, &instructions, &names);
+    let best_bid = Arc::new(Mutex::new(std::usize::MAX));
+
+    for i in 0..num_cpus::get() {
+        let init = init.clone();
+        let best_bid = best_bid.clone();
+        let names = names.clone();
+        std::thread::spawn(move || {
+            loop {
+                let (bid, solution) = divide_up(init.clone());
+                let mut best_bid = best_bid.lock().expect("no poison");
+                if bid < *best_bid {
+                    *best_bid = bid;
+                    for (pkg, instructions) in solution {
+                        render(pkg, &instructions, &names);
+                    }
+                    println!("new winner! {}", bid);
+                } else {
+                    println!("loser: {}", bid);
+                }
             }
-            println!("new winner! {}", bid);
-        } else {
-            println!("loser: {}", bid);
-        }
+        });
     }
+    println!("press return to exit:");
+    let mut ignored = String::new();
+    io::stdin().read_line(&mut ignored).unwrap();
 }
 
 fn dominators(map: OutstandingDeps, namer: PkgIdLookup) {
