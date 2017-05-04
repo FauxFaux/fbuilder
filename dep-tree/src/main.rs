@@ -249,9 +249,9 @@ where I: Iterator<Item=T>,
 }
 
 fn render(pkg: PkgId, instructions: &Instructions, names: &HashMap<PkgId, String>) -> io::Result<()> {
-    let mut out = fs::File::create(
+    let mut out = io::BufWriter::new(fs::File::create(
             format!("target/{}.Dockerfile", names[&pkg])
-        )?;
+        )?);
 
     writeln!(out, "FROM sid-be:latest")?;
     writeln!(out, "WORKDIR /build")?;
@@ -298,11 +298,11 @@ fn divide_up(state: State) -> (usize, Vec<(PkgId, Instructions)>) {
 
 fn main() {
     let (namer, map) = load().expect("loading file");
-    let names = namer.reverse();
+    let names = Arc::new(namer.reverse());
 
     let best_bid = Arc::new(Mutex::new(std::usize::MAX));
 
-    for i in 0..num_cpus::get() {
+    for _ in 0..num_cpus::get() {
         let map = map.clone();
         let best_bid = best_bid.clone();
         let names = names.clone();
@@ -313,10 +313,10 @@ fn main() {
                 let mut best_bid = best_bid.lock().expect("no poison");
                 if bid < *best_bid {
                     print!("new winner: {}... ", bid);
-                    io::stdout().flush();
+                    io::stdout().flush().expect("writing");
                     *best_bid = bid;
                     for (pkg, instructions) in solution {
-                        render(pkg, &instructions, &names);
+                        render(pkg, &instructions, &names).expect("writing");
                     }
                     println!("written.");
                 } else {
