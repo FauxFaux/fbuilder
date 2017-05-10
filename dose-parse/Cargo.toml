@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
 
 [dependencies]
+clap = "2.24.1"
 yaml-rust = "0.3.5"
 

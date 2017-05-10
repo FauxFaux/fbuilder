@@ -2,15 +2,16 @@
 #![feature(retain_hash_collection)]
 #![feature(vec_remove_item)]
 
+extern crate clap;
 extern crate yaml_rust;
 
-use std::env;
 use std::fs;
 use std::io;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
 
+use clap::Arg;
 use yaml_rust::parser::*;
 
 // magic:
@@ -23,6 +24,7 @@ enum NextIs {
     Package,
     Version,
     Type,
+    Arch,
     Ignore,
 }
 
@@ -30,11 +32,16 @@ enum NextIs {
 struct Package {
     name: String,
     version: String,
+    arch: String,
 }
 
 impl Package {
     fn new() -> Package {
-        Package { name: String::new(), version: String::new() }
+        Package {
+            name: String::new(),
+            version: String::new(),
+            arch: String::new(),
+        }
     }
 
     fn clear(&mut self) {
@@ -46,14 +53,18 @@ impl Package {
         !self.name.is_empty() && !self.version.is_empty()
     }
 
-    fn to_string(&self) -> String {
+    fn to_string(&self, version: bool) -> String {
         assert!(self.is_set());
-        //format!("{}:{}", self.name, self.version)
-        self.name.clone()
+        if version {
+            format!("{}:{}:{}", self.name, self.version, self.arch)
+        } else {
+            self.name.clone()
+        }
     }
 }
 
 struct FirstPass {
+    versions: bool,
     depth: u8,
     source: Package,
     dep: Package,
@@ -64,8 +75,9 @@ struct FirstPass {
 }
 
 impl FirstPass {
-    fn new(ignored: HashSet<String>) -> FirstPass {
+    fn new(versions: bool, ignored: HashSet<String>) -> FirstPass {
         FirstPass {
+            versions,
             depth: 0,
             source: Package::new(),
             dep: Package::new(),
@@ -102,7 +114,7 @@ impl EventReceiver for FirstPass {
             },
             &Event::MappingEnd => {
                 if 3 == self.depth && self.dep.is_set() && !self.ignored.contains(&self.dep.name) {
-                    self.deps.push(self.dep.to_string());
+                    self.deps.push(self.dep.to_string(self.versions));
                 }
                 self.depth -= 1;
                 self.dep.clear();
@@ -110,7 +122,7 @@ impl EventReceiver for FirstPass {
             &Event::SequenceStart ( 0 ) => {},
             &Event::SequenceEnd => {
                 if 2 == self.depth {
-                    self.packages.insert(self.source.to_string(), self.deps.clone());
+                    self.packages.insert(self.source.to_string(false), self.deps.clone());
                     self.deps.clear();
                 }
             }
@@ -121,6 +133,7 @@ impl EventReceiver for FirstPass {
                             "package" => NextIs::Package,
                             "version" => NextIs::Version,
                             "type" => NextIs::Type,
+                            "architecture" => NextIs::Arch,
                             _ => NextIs::Ignore,
                         };
                     },
@@ -130,6 +143,10 @@ impl EventReceiver for FirstPass {
                     },
                     NextIs::Version => {
                         self.relevant_field(|pkg| pkg.version = label.clone());
+                        self.map_state = NextIs::Key;
+                    },
+                    NextIs::Arch => {
+                        self.relevant_field(|pkg| pkg.arch = label.clone());
                         self.map_state = NextIs::Key;
                     },
                     NextIs::Type => {
@@ -157,15 +174,38 @@ fn load_list(path: &str) -> io::Result<HashSet<String>> {
     Ok(ret)
 }
 
-fn main() {
-    let input_path = env::args().nth(1).expect("first argument: input file");
-    let ignored = load_list(
-        env::args().nth(2).expect("second argument: ignored package list").as_str())
-        .expect("reading ignored file");
+fn real_main() -> u8 {
+    let matches = clap::App::new("dose-parse")
+        .arg(Arg::with_name("include-versions")
+             .long("include-versions")
+             .help("output pkg:version:arch strings"))
+        .arg(Arg::with_name("INPUT")
+             .help("dose output file to read")
+             .required(true))
+        .arg(Arg::with_name("excluded")
+             .long("excluded")
+             .takes_value(true)
+             .help("exclude packages from processing (memory hack only)"))
+        .get_matches();
+
+    let input_path = matches.value_of("INPUT").unwrap();
+    let ignored =
+        if let Some(path) = matches.value_of("excluded") {
+            load_list(path).expect("loading excluded file")
+        } else {
+            HashSet::new()
+        };
+
+    let versions = matches.is_present("include-versions");
+
+    if versions != ignored.is_empty() {
+        println!("--include-versions and --excluded are incompatible");
+        return 2;
+    }
 
     let file = fs::File::open(input_path).expect("input file must be readable");
     let mut parser = Parser::new(io::BufReader::new(file).chars().map(|r| r.expect("file read as utf-8")));
-    let mut pass = FirstPass::new(ignored.clone());
+    let mut pass = FirstPass::new(versions, ignored.clone());
     parser.load(&mut pass, false).expect("yaml parse successs");
     let packages = pass.packages;
 
@@ -204,5 +244,10 @@ fn main() {
             println!(" - {}", item);
         }
     }
+
+    return 0;
 }
 
+fn main() {
+    std::process::exit(real_main() as i32);
+}
