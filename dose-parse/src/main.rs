@@ -1,5 +1,4 @@
 #![feature(io)]
-#![feature(retain_hash_collection)]
 #![feature(vec_remove_item)]
 
 extern crate clap;
