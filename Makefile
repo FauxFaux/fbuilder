@@ -14,7 +14,7 @@ data/dose-%.yaml: data/%/packages data/sources docker/dose.latest
 	cp -ar --reflink=auto $< data/sources vol
 	$(RM) vol/buildcheck
 	-docker run -v $(shell pwd)/vol:/vol -i dose:latest \
-		deb-buildcheck --deb-ignore-essential --explain --successes --deb-native-arch=$(ARCH) \
+		deb-buildcheck --deb-ignore-essential --explain --successes --deb-native-arch=$* \
         	/vol/packages /vol/sources \
         	--outfile=/vol/buildcheck
 	cp -ar vol/buildcheck $@

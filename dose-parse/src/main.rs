@@ -186,7 +186,7 @@ fn real_main() -> u8 {
     let mut sorted: Vec<&String> = ignored.iter().collect();
     sorted.sort();
 
-    println!("_base");
+    print!("_base");
     for extra in sorted {
         print!(" {}", extra);
     }
