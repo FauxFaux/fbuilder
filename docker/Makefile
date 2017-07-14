@@ -39,8 +39,8 @@ clean-cache:
 	$(RM) -f dose-yaml/*.xz dose-yaml/**/*.xz dose-yaml/sources dose-yaml/**/packages
 
 clean: clean-cache
-	docker rmi dose:latest sid-be:latest
-	$(RM) dose-*.yaml
+	-docker rmi dose:latest sid-be:latest
+	$(RM) -f dose-*.yaml
 
 
 deps:
