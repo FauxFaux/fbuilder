@@ -1,16 +1,14 @@
 #![feature(io)]
-#![feature(vec_remove_item)]
 
-extern crate clap;
 extern crate yaml_rust;
 
+use std::env;
 use std::fs;
 use std::io;
 
 use std::collections::HashSet;
 use std::collections::HashMap;
 
-use clap::Arg;
 use yaml_rust::parser::*;
 
 // magic:
@@ -174,74 +172,39 @@ fn load_list(path: &str) -> io::Result<HashSet<String>> {
 }
 
 fn real_main() -> u8 {
-    let matches = clap::App::new("dose-parse")
-        .arg(Arg::with_name("include-versions")
-             .long("include-versions")
-             .help("output pkg:version:arch strings"))
-        .arg(Arg::with_name("INPUT")
-             .help("dose output file to read")
-             .required(true))
-        .arg(Arg::with_name("excluded")
-             .long("excluded")
-             .takes_value(true)
-             .help("exclude packages from processing (memory hack only)"))
-        .get_matches();
+    let input_path = env::args().nth(1).expect("first argument: dose-yaml");
+    let essentials = env::args().nth(2).expect("second argument: packages in the base");
 
-    let input_path = matches.value_of("INPUT").unwrap();
-    let ignored =
-        if let Some(path) = matches.value_of("excluded") {
-            load_list(path).expect("loading excluded file")
-        } else {
-            HashSet::new()
-        };
-
-    let versions = matches.is_present("include-versions");
-
-    if versions != ignored.is_empty() {
-        println!("--include-versions and --excluded are incompatible");
-        return 2;
-    }
+    let ignored = load_list(&essentials).expect("essentials loaded");
 
     let file = fs::File::open(input_path).expect("input file must be readable");
     let mut parser = Parser::new(io::BufReader::new(file).chars().map(|r| r.expect("file read as utf-8")));
-    let mut pass = FirstPass::new(versions, ignored.clone());
+    let mut pass = FirstPass::new(false, ignored.clone());
     parser.load(&mut pass, false).expect("yaml parse successs");
     let packages = pass.packages;
 
-    let mut extra_essential: HashSet<String> = packages.values()
-        .nth(0).expect("at least one package")
-        .iter().map(|s| s.clone()).collect();
-
-    for dep in packages.values() {
-        extra_essential.retain(|pkg| dep.contains(pkg));
-    }
-
-    for ignoree in ignored {
-        extra_essential.insert(ignoree);
-    }
-
-    let mut sorted: Vec<&String> = extra_essential.iter().collect();
+    let mut sorted: Vec<&String> = ignored.iter().collect();
     sorted.sort();
 
-    println!("_essential:");
+    println!("_base");
     for extra in sorted {
-        println!(" - {}", extra);
+        print!(" {}", extra);
     }
+    println!();
 
     let mut keys: Vec<&String> = packages.keys().collect();
     keys.sort();
 
     for src in keys.iter() {
-        println!("{}:", src);
+        print!("{}", src);
 
         let mut new = packages[src.as_str()].clone();
-        for extra in extra_essential.iter() {
-            new.remove_item(&extra);
-        }
+        new.retain(|item| !ignored.contains(item));
         new.sort();
         for item in new {
-            println!(" - {}", item);
+            print!(" {}", item);
         }
+        println!();
     }
 
     return 0;
