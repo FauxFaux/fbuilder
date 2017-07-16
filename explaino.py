@@ -28,23 +28,29 @@ def scan(statement) -> List:
 
         # these commands need *some* action, but maybe they're triggerable?
         if cmd.text in (
+                'add-shell',
                 'dpkg-divert',
                 'dpkg-trigger',
                 'dpkg-maintscript-helper',
                 'ucf',  # update-configuration-file
                 'update-alternatives',
                 'update-icon-caches',
+                'update-perl-sax-parsers',
                 'update-menus',
                 'update-mime',
                 'update-mime-database.real',
+                'update-xmlcatalog',
                 'cp',  # TODO: obviously not okay
                 'ln',  # TODO: obviously not okay
                 'rm',  # TODO: obviously not okay
                 'mv',  # TODO: obviously not okay
                 'mkdir',  # TODO: obviously not okay
                 'rmdir',  # TODO: obviously not okay
+                'db_get',  # TODO: debconf? What year is it??
                 'db_purge',  # TODO: debconf? What year is it??
+                'db_version',  # TODO: debconf? What year is it??
                 'py3compile',
+                'libgvc6-config-update',
                 'update-rc.d'
         ):
             return {cmd.text}
@@ -70,7 +76,7 @@ def scan(statement) -> List:
                 'print',  # TODO: is this even valid?
                 'exit',
                 'cd',
-                'cat',  # TODO: useless
+                'umask',
         ):
             return set()
 
