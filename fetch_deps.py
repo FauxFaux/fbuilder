@@ -23,9 +23,12 @@ def main():
                 wanted.remove(parts[0])
                 needed.update(parts[1:])
 
+    assert set() != needed
+
     #deb2pg/apt% egrep '^Filename: pool' fakedroot/var/lib/apt/lists/deb.debian.org_debian_dists_unstable_main_binary-amd64_Packages | cut -d/ -f 2- > ~/code/fbuilder/unstable.lst
     RE = re.compile('/([^/_]*)_')
     debs = set()
+    urls = []
     with open('data/unstable.lst') as listing:
         for line in listing:
             pkg = RE.search(line).group(1)
@@ -33,7 +36,11 @@ def main():
                 needed.remove(pkg)
                 parts = line.split('/')
                 debs.add(parts[len(parts) - 1].strip())
-                # print(mirror + line.strip())
+                urls.append(mirror + line.strip())
+
+    assert set() == needed
+
+    subprocess.check_call(['wget', '-nc'] + urls, cwd='debs')
 
     control = defaultdict(dict)
     for deb in debs:
@@ -46,7 +53,7 @@ def main():
 
     for deb, content in control.items():
         for name, data in content.items():
-            print('{} {} {}', deb, name, len(data))
+            print('{} {} {}'.format(len(data), deb, name))
 
 
 if '__main__' == __name__:
