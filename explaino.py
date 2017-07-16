@@ -58,8 +58,11 @@ def explaino(body: str):
             '#!/bin/sh',
             '#!/bin/bash',
             '#!/usr/bin/env bash',
+            '#! /bin/sh',
     ):
         raise Exception("unsupported shebang: " + shebang)
+
+    print (remain)
 
     actions = set()
     for statement in bashlex.parse(remain):
