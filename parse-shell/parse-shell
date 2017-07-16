@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+
+const parse = require('bash-parser');
+
+// this is a joke, right?
+let inputChunks = [];
+process.stdin.resume();
+process.stdin.on('data', function(chunk) {
+    inputChunks.push(chunk);
+});
+
+process.stdin.on('end', function () {
+    const input = inputChunks.join('');
+    process.stdout.write(input);
+    process.stdout.write(JSON.stringify(parse(input)));
+});
