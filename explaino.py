@@ -1,53 +1,89 @@
 #!/usr/bin/env python3
+import subprocess
 import unittest
 from typing import List
 
-import bashlex
-from bashlex import ast
+import json
+import munch  # python3-munch
 
-
-def evaluate_cond(cond: ast.node) -> bool:
-    assert 'list' == cond.kind
-    assert 2 == len(cond.parts)
-
-    # trailing semicolon, pointless
-    assert 'operator' == cond.parts[1].kind
-    assert ';' == cond.parts[1].op
+def evaluate_cond(cond) -> bool:
+    assert 'CompoundList' == cond.type
+    assert 1 == len(cond.commands)
 
     # TODO: eliminate stuff
+    # print('assuming condition is true:', cond.commands)
 
     return True
 
 
-def scan(statement: ast.node) -> List:
-    if 'command' == statement.kind:
-        cmd = statement.parts
-        assert 'word' == cmd[0].kind
-        if cmd[0].word in (
-                'set',
+def scan(statement) -> List:
+    if 'Command' == statement.type:
+        if 'name' not in statement:
+            # variable assignment
+            assert 'prefix' in statement
+            return set()
+        cmd = statement.name
+        assert 'Word' == cmd.type
+
+        # these commands need *some* action, but maybe they're triggerable?
+        if cmd.text in (
+                'dpkg-divert',
+                'dpkg-trigger',
+                'dpkg-maintscript-helper',
+                'ucf', # update-configuration-file
+                'update-alternatives',
+                'update-icon-caches',
+                'update-menus',
+                'update-mime',
+                'update-mime-database.real',
+                'cp',  # TODO: obviously not okay
+                'ln',  # TODO: obviously not okay
+                'rm',  # TODO: obviously not okay
+                'mv',  # TODO: obviously not okay
+                'mkdir',  # TODO: obviously not okay
+                'rmdir',  # TODO: obviously not okay
+                'db_purge',  # TODO: debconf? What year is it??
+                'py3compile',
+                'update-rc.d'
+        ):
+            return {cmd.text}
+
+        if '.' == cmd.text:
+            assert 1 == len(statement.suffix)
+            what = statement.suffix[0]
+            assert 'Word' == what.type
+            if what.text in (
+                '/usr/share/debconf/confmodule'
+            ):
+                return set()
+
+        if cmd.text in (
+                'ldconfig'
+        ) and 'suffix' not in statement:
+            return {'ldconfig'}
+
+        # lol no
+        if cmd.text in (
+            'set',
+            'echo',
+            'print',  # TODO: is this even valid?
+            'exit',
+            'cd',
+            'cat',  # TODO: useless
         ):
             return set()
 
-        if 1 == len(cmd) and cmd[0].word in (
-                'ldconfig'
-        ):
-            return {'ldconfig'}
+        raise Exception('unsupported command: ' + cmd.text)
+    elif 'If' == statement.type:
+        if evaluate_cond(statement.clause):
+            return scan(statement.then)
+    elif 'CompoundList' == statement.type:
+        actions = set()
+        for sub in statement.commands:
+            actions.update(scan(sub))
+        return actions
 
-    elif 'compound' == statement.kind:
-        assert 1 == len(statement.list)
-        un_compound = statement.list.pop(0)
-        if 'if' == un_compound.kind:
-            assert 5 == len(un_compound.parts)
-            # if
-            cond = un_compound.parts[1]
-            # then
-            body = un_compound.parts[3]
-            # fi
-
-            if evaluate_cond(cond):
-                return scan(body)
-
-    raise Exception("unsupported statement: " + str(statement))
+    raise Exception("unsupported statement: " + statement.type + " // " + str(statement))
 
 
 def explaino(body: str):
@@ -56,17 +92,31 @@ def explaino(body: str):
     remain = body[line_end + 1:]
     if shebang not in (
             '#!/bin/sh',
+            '#!/bin/sh -e',
+            '#! /bin/sh -e',
             '#!/bin/bash',
             '#!/usr/bin/env bash',
             '#! /bin/sh',
     ):
         raise Exception("unsupported shebang: " + shebang)
 
-    print (remain)
-
+    parse = subprocess.Popen(['parse-shell/parse-shell'],
+                             stdin=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL,  # TODO
+                             stdout=subprocess.PIPE,
+                             )
+    out, _ = parse.communicate(remain.encode('utf-8'))
+    raw_dict = json.loads(out.decode('utf-8'))
+    doc = munch.munchify(raw_dict)
     actions = set()
-    for statement in bashlex.parse(remain):
-        actions.update(scan(statement))
+    try:
+        for statement in doc.commands:
+            actions.update(scan(statement))
+    except:
+        # print(body)
+        # print(json.dumps(raw_dict, indent=' '))
+        # print(doc)
+        raise
 
     return actions
 
@@ -84,4 +134,27 @@ set -e
 if [ "$1" = "configure" ]; then
   ldconfig
 fi
+"""))
+
+    def test_libxml2(self):
+        self.assertEqual(set(), explaino("""#!/bin/sh
+
+set -e
+
+[ "$1" = "upgrade" ] &&
+[ -L /usr/share/doc/libxml2-utils ] &&
+rm -f /usr/share/doc/libxml2-utils
+
+
+
+exit 0"""))
+
+    def test_assignment(self):
+        self.assertEqual(set(), explaino("""#!/bin/sh
+A=5
+"""))
+
+    def test_fake_env(self):
+        self.assertEqual({'ldconfig'}, explaino("""#!/bin/sh
+A=5 ldconfig
 """))

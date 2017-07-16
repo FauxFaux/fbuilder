@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import gzip
+import json
 import os
 import re
 import subprocess
 import tarfile
+
+import explaino
 
 import sys
 from collections import defaultdict
@@ -51,10 +54,22 @@ def main():
             if contents:
                 control[deb][member.name] = contents.read()
 
+    scripties = []
     for deb, content in control.items():
         for name, data in content.items():
-            print('{} {} {}'.format(len(data), deb, name))
+            if name in ('./postinst', './preinst'):
+                scripties.append((deb, name, data))
 
+    scripties.sort(key=lambda x: len(x[2]))
+
+    for deb, name, data in scripties:
+        try:
+            print(deb, name, explaino.explaino(data.decode('utf-8')))
+        except json.decoder.JSONDecodeError as e:
+            print(deb, name, 'parse failed :((((((((((((((')
+        except Exception as e:
+            msg = str(e)
+            print(deb, name, type(e), msg[0:160])
 
 if '__main__' == __name__:
     main()
