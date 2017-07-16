@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-import gzip
 import json
-import os
 import re
 import subprocess
 import tarfile
-
-import explaino
+from collections import defaultdict
 
 import sys
-from collections import defaultdict
+
+import explaino
 
 
 def main():
@@ -28,7 +26,7 @@ def main():
 
     assert set() != needed
 
-    #deb2pg/apt% egrep '^Filename: pool' fakedroot/var/lib/apt/lists/deb.debian.org_debian_dists_unstable_main_binary-amd64_Packages | cut -d/ -f 2- > ~/code/fbuilder/unstable.lst
+    # deb2pg/apt% egrep '^Filename: pool' fakedroot/var/lib/apt/lists/deb.debian.org_debian_dists_unstable_main_binary-amd64_Packages | cut -d/ -f 2- > ~/code/fbuilder/unstable.lst
     RE = re.compile('/([^/_]*)_')
     debs = set()
     urls = []
@@ -47,7 +45,8 @@ def main():
 
     control = defaultdict(dict)
     for deb in debs:
-        control_gz = subprocess.Popen(['bsdtar', '-Oxf', 'debs/' + deb, 'control.tar.gz'], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        control_gz = subprocess.Popen(['bsdtar', '-Oxf', 'debs/' + deb, 'control.tar.gz'], stdin=subprocess.DEVNULL,
+                                      stdout=subprocess.PIPE)
         tar = tarfile.open(fileobj=control_gz.stdout, mode='r|gz')
         for member in tar:
             contents = tar.extractfile(member)
@@ -70,6 +69,7 @@ def main():
         except Exception as e:
             msg = str(e)
             print(deb, name, type(e), msg[0:160])
+
 
 if '__main__' == __name__:
     main()

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+import json
 import subprocess
 import unittest
 from typing import List
 
-import json
 import munch  # python3-munch
+
 
 def evaluate_cond(cond) -> bool:
     assert 'CompoundList' == cond.type
@@ -30,7 +31,7 @@ def scan(statement) -> List:
                 'dpkg-divert',
                 'dpkg-trigger',
                 'dpkg-maintscript-helper',
-                'ucf', # update-configuration-file
+                'ucf',  # update-configuration-file
                 'update-alternatives',
                 'update-icon-caches',
                 'update-menus',
@@ -53,7 +54,7 @@ def scan(statement) -> List:
             what = statement.suffix[0]
             assert 'Word' == what.type
             if what.text in (
-                '/usr/share/debconf/confmodule'
+                    '/usr/share/debconf/confmodule'
             ):
                 return set()
 
@@ -64,12 +65,12 @@ def scan(statement) -> List:
 
         # lol no
         if cmd.text in (
-            'set',
-            'echo',
-            'print',  # TODO: is this even valid?
-            'exit',
-            'cd',
-            'cat',  # TODO: useless
+                'set',
+                'echo',
+                'print',  # TODO: is this even valid?
+                'exit',
+                'cd',
+                'cat',  # TODO: useless
         ):
             return set()
 
