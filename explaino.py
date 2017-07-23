@@ -22,11 +22,23 @@ def evaluate_cond(cond) -> Tuple[List[str], Cond]:
     # print('assuming condition is true:', cond.commands)
 
     statement = cond.commands[0]
-    assert 'Command' == statement.type
+    if 'Command' != statement.type:
+        raise Exception("unexpected if statement: " + str(statement))
 
     cmd = statement.name
-    assert 'Word' == cmd.type
-    assert '[' == cmd.text
+    if 'Word' != cmd.type:
+        raise Exception("Unexpected command type: " + str(cmd.type))
+
+    if cmd.text in (
+        'which'
+    ):
+        return set(), Cond.DUNNO
+
+    if cmd.text not in (
+        '[',
+        'test'
+    ):
+        raise Exception("non-conditional if statement, running: " + cmd.text)
 
     side_effects = set()
     for part in statement.suffix:
