@@ -2,19 +2,39 @@
 import json
 import subprocess
 import unittest
-from typing import List
+from enum import Enum
+from typing import List, Tuple
 
 import munch  # python3-munch
 
 
-def evaluate_cond(cond) -> bool:
+class Cond(Enum):
+    ALWAYS_YES = 1
+    ALWAYS_NO = 2
+    DUNNO = 3
+
+
+def evaluate_cond(cond) -> Tuple[List[str], Cond]:
     assert 'CompoundList' == cond.type
     assert 1 == len(cond.commands)
 
     # TODO: eliminate stuff
     # print('assuming condition is true:', cond.commands)
 
-    return True
+    statement = cond.commands[0]
+    assert 'Command' == statement.type
+
+    cmd = statement.name
+    assert 'Word' == cmd.type
+    assert '[' == cmd.text
+
+    side_effects = set()
+    for part in statement.suffix:
+        if 'Word' == part.type:
+            continue
+        side_effects.update(scan(part))
+
+    return side_effects, Cond.DUNNO
 
 
 def scan(statement) -> List:
@@ -46,9 +66,9 @@ def scan(statement) -> List:
                 'mv',  # TODO: obviously not okay
                 'mkdir',  # TODO: obviously not okay
                 'rmdir',  # TODO: obviously not okay
-                'db_get',  # TODO: debconf? What year is it??
-                'db_purge',  # TODO: debconf? What year is it??
-                'db_version',  # TODO: debconf? What year is it??
+                'db_get',  # TODO: debconf?
+                'db_purge',  # TODO: debconf?
+                'db_version',  # TODO: debconf?
                 'py3compile',
                 'libgvc6-config-update',
                 'update-rc.d'
@@ -82,8 +102,20 @@ def scan(statement) -> List:
 
         raise Exception('unsupported command: ' + cmd.text)
     elif 'If' == statement.type:
-        if evaluate_cond(statement.clause):
-            return scan(statement.then)
+        side_effects, res = evaluate_cond(statement.clause)
+        if Cond.DUNNO == res:
+            side_effects.update(scan(statement.then))
+            if 'otherwise' in statement:
+                side_effects.update(scan(statement.otherwise))
+        elif Cond.ALWAYS_YES == res:
+            side_effects.update(scan(statement.then))
+        elif Cond.ALWAYS_NO == res:
+            side_effects.update(scan(statement.otherwise))
+        else:
+            raise Exception('Impossible cond: ' + res)
+
+        return side_effects
+
     elif 'CompoundList' == statement.type:
         actions = set()
         for sub in statement.commands:
@@ -143,6 +175,8 @@ if [ "$1" = "configure" ]; then
 fi
 """))
 
+    # don't support this type of conditional expression
+    @unittest.expectedFailure
     def test_libxml2(self):
         self.assertEqual(set(), explaino("""#!/bin/sh
 
