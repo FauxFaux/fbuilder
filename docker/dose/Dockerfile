@@ -3,6 +3,7 @@ FROM sid-be:latest
 RUN apt-get install --no-install-recommends -y \
     cppo \
     ocaml-nox \
+    ocamlbuild \
     libcudf-ocaml-dev \
     libocamlgraph-ocaml-dev \
     libre-ocaml-dev
