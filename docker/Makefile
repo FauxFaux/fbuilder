@@ -14,4 +14,4 @@ clean-cache:
 
 clean: clean-cache
 	-docker rmi dose:latest sid-be:latest
-	$(RM) -f dose-*.yaml
+	$(RM) -f dose-*.yaml sid-be.latest dose.latest
