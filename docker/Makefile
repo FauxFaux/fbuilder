@@ -3,7 +3,7 @@ ARCH ?= amd64
 all: dose.latest
 
 %.latest: $(wildcard $*/*)
-	docker build --network=mope --tag=$*:latest $*
+	docker build --no-cache --network=mope --tag=$*:latest $*
 	touch $@
 
 dose.latest: sid-be.latest
