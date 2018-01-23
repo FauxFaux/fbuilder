@@ -98,32 +98,32 @@ impl FirstPass {
 }
 
 impl EventReceiver for FirstPass {
-    fn on_event(&mut self, ev: &Event) {
+    fn on_event(&mut self, ev: Event) {
         match ev {
-            &Event::StreamStart
-                | &Event::DocumentStart
-                | &Event::DocumentEnd
-                | &Event::StreamEnd => {},
-            &Event::MappingStart ( 0 ) => {
+            Event::StreamStart
+                | Event::DocumentStart
+                | Event::DocumentEnd
+                | Event::StreamEnd => {},
+            Event::MappingStart ( 0 ) => {
                 assert!(self.depth < 3);
                 self.depth += 1;
                 self.map_state = NextIs::Key;
             },
-            &Event::MappingEnd => {
+            Event::MappingEnd => {
                 if 3 == self.depth && self.dep.is_set() && !self.ignored.contains(&self.dep.name) {
                     self.deps.push(self.dep.to_string(self.versions));
                 }
                 self.depth -= 1;
                 self.dep.clear();
             }
-            &Event::SequenceStart ( 0 ) => {},
-            &Event::SequenceEnd => {
+            Event::SequenceStart ( 0 ) => {},
+            Event::SequenceEnd => {
                 if 2 == self.depth {
                     self.packages.insert(self.source.to_string(false), self.deps.clone());
                     self.deps.clear();
                 }
             }
-            &Event::Scalar ( ref label, _, 0, None ) => {
+            Event::Scalar ( ref label, _, 0, None ) => {
                 match self.map_state {
                     NextIs::Key => {
                         self.map_state = match label.as_str() {
@@ -155,7 +155,7 @@ impl EventReceiver for FirstPass {
                     }
                 };
             }
-            &ref a => panic!(format!("{:?}", a)),
+            a => panic!(format!("{:?}", a)),
         }
     }
 }
